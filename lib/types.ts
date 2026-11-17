@@ -38,5 +38,4 @@ export type MatchedProfile = z.infer<typeof MatchedProfileSchema>;
 export type FeedResponse = z.infer<typeof FeedResponseSchema>;
 export type MatchesResponse = z.infer<typeof MatchesResponseSchema>;
 export type SwipeResult =
-  | { matched: false }
-  | { matched: true; profile: PublicProfile };
+  { matched: false } | { matched: true; profile: PublicProfile };

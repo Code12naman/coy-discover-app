@@ -32,8 +32,8 @@
     --border: #3b3034;
     --primary: #e5484d;
     --primary-contrast: #ffffff;
-    --like: #54b987;
-    --pass: #b9acab;
+    --like: #2fa36b;
+    --pass: #6b6368;
     --accent: #553b39;
   }
 }
@@ -79,6 +79,13 @@ a:focus-visible {
 
 .photo-placeholder {
   background: var(--surface-2);
+}
+
+.profile-interest {
+  background-color: color-mix(in srgb, var(--match-text) 92%, transparent);
+  color: var(--match-bg);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 .match-surface {

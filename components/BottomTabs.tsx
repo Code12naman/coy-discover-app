@@ -33,10 +33,15 @@ export function BottomTabs({ activeTab, onChange }: BottomTabsProps) {
             aria-current={active ? "page" : undefined}
             onClick={() => onChange(id)}
             className={`flex min-h-[48px] min-w-[92px] flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium transition-colors ${
-              active ? "text-primary" : "text-muted hover:text-text"
+              active ? "text-text" : "text-muted hover:text-text"
             }`}
           >
-            <Icon aria-hidden="true" size={21} strokeWidth={1.8} />
+            <Icon
+              aria-hidden="true"
+              size={21}
+              strokeWidth={1.8}
+              className={active ? "text-primary" : undefined}
+            />
             <span>{label}</span>
           </button>
         );

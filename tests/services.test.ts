@@ -36,7 +36,11 @@ describe("Discover services", () => {
     ).run({ ...profile, interests: JSON.stringify(profile.interests) });
   }
 
-  function addSwipe(swiperId: string, targetId: string, direction: "like" | "pass"): void {
+  function addSwipe(
+    swiperId: string,
+    targetId: string,
+    direction: "like" | "pass",
+  ): void {
     db.prepare(
       "INSERT INTO swipes (swiper_id, target_id, direction) VALUES (?, ?, ?)",
     ).run(swiperId, targetId, direction);
@@ -55,10 +59,24 @@ describe("Discover services", () => {
     addProfile("p1", "Maya");
     addSwipe("p1", "me", "like");
 
-    expect(swipeProfile(db, "p1", "like")).toEqual({
+    const result = swipeProfile(db, "p1", "like");
+    expect(result).toEqual({
       matched: true,
       profile: expect.objectContaining({ id: "p1", name: "Maya" }),
     });
+    if (result.matched) {
+      expect(Object.keys(result.profile).sort()).toEqual(
+        [
+          "age",
+          "bio",
+          "city_or_college",
+          "id",
+          "interests",
+          "name",
+          "photo_url",
+        ].sort(),
+      );
+    }
     expect(getMatches(db)).toHaveLength(1);
   });
 
@@ -85,11 +103,17 @@ describe("Discover services", () => {
     expect(swipeProfile(db, "p1", "like")).toEqual({ matched: false });
     expect(
       db
-        .prepare("SELECT direction FROM swipes WHERE swiper_id = 'me' AND target_id = 'p1'")
+        .prepare(
+          "SELECT direction FROM swipes WHERE swiper_id = 'me' AND target_id = 'p1'",
+        )
         .get(),
     ).toEqual({ direction: "pass" });
     expect(
-      db.prepare("SELECT COUNT(*) AS count FROM swipes WHERE swiper_id = 'me' AND target_id = 'p1'").get(),
+      db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM swipes WHERE swiper_id = 'me' AND target_id = 'p1'",
+        )
+        .get(),
     ).toEqual({ count: 1 });
   });
 
@@ -102,7 +126,15 @@ describe("Discover services", () => {
 
     expect(after).toEqual(before);
     expect(Object.keys(after[0] ?? {}).sort()).toEqual(
-      ["age", "bio", "city_or_college", "id", "interests", "name", "photo_url"].sort(),
+      [
+        "age",
+        "bio",
+        "city_or_college",
+        "id",
+        "interests",
+        "name",
+        "photo_url",
+      ].sort(),
     );
     expect(swipeProfile(db, "p1", "like")).toEqual({ matched: false });
   });
@@ -113,13 +145,19 @@ describe("Discover services", () => {
     addProfile("p3");
     addSwipe("me", "p1", "like");
     addSwipe("p1", "me", "like");
-    db.prepare("INSERT INTO matches (profile_id) VALUES ('p1')").run();
+    db.prepare(
+      "INSERT INTO matches (profile_id, created_at) VALUES ('p1', '2025-01-01 00:00:00')",
+    ).run();
     addSwipe("me", "p2", "like");
     addSwipe("p2", "me", "pass");
     db.prepare("INSERT INTO matches (profile_id) VALUES ('p2')").run();
+    addSwipe("me", "p3", "like");
     addSwipe("p3", "me", "like");
+    db.prepare(
+      "INSERT INTO matches (profile_id, created_at) VALUES ('p3', '2025-02-01 00:00:00')",
+    ).run();
 
-    expect(getMatches(db).map(({ id }) => id)).toEqual(["p1"]);
+    expect(getMatches(db).map(({ id }) => id)).toEqual(["p3", "p1"]);
   });
 
   it("returns 400 for invalid input and 404 for an unknown profile", async () => {
@@ -162,7 +200,15 @@ describe("Discover services", () => {
 
     expect(response.status).toBe(200);
     expect(Object.keys(payload.profiles[0] ?? {}).sort()).toEqual(
-      ["age", "bio", "city_or_college", "id", "interests", "name", "photo_url"].sort(),
+      [
+        "age",
+        "bio",
+        "city_or_college",
+        "id",
+        "interests",
+        "name",
+        "photo_url",
+      ].sort(),
     );
     expect(invalid.status).toBe(400);
   });
