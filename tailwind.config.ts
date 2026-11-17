@@ -9,8 +9,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        bg: "var(--bg)",
+        surface: "var(--surface)",
+        "surface-2": "var(--surface-2)",
+        text: "var(--text)",
+        muted: "var(--text-muted)",
+        border: "var(--border)",
+        primary: "var(--primary)",
+        "primary-contrast": "var(--primary-contrast)",
+        like: "var(--like)",
+        pass: "var(--pass)",
+        accent: "var(--accent)",
+        "match-bg": "var(--match-bg)",
+        "match-text": "var(--match-text)",
+      },
+      fontFamily: {
+        sans: ["var(--font-body)", "sans-serif"],
+        display: ["var(--font-display)", "serif"],
+      },
+      boxShadow: {
+        card: "0 8px 24px rgba(31, 26, 28, 0.08)",
       },
     },
   },

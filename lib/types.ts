@@ -15,9 +15,28 @@ export const SwipeRequestSchema = z.object({
   direction: z.enum(["like", "pass"]),
 });
 
+export const FeedResponseSchema = z.object({
+  profiles: z.array(PublicProfileSchema),
+});
+
+export const MatchedProfileSchema = PublicProfileSchema.extend({
+  matchedAt: z.string(),
+});
+
+export const MatchesResponseSchema = z.object({
+  matches: z.array(MatchedProfileSchema),
+});
+
+export const SwipeResponseSchema = z.discriminatedUnion("matched", [
+  z.object({ matched: z.literal(false) }),
+  z.object({ matched: z.literal(true), profile: PublicProfileSchema }),
+]);
+
 export type PublicProfile = z.infer<typeof PublicProfileSchema>;
 export type SwipeDirection = z.infer<typeof SwipeRequestSchema>["direction"];
-export type MatchedProfile = PublicProfile & { matchedAt: string };
+export type MatchedProfile = z.infer<typeof MatchedProfileSchema>;
+export type FeedResponse = z.infer<typeof FeedResponseSchema>;
+export type MatchesResponse = z.infer<typeof MatchesResponseSchema>;
 export type SwipeResult =
   | { matched: false }
   | { matched: true; profile: PublicProfile };
