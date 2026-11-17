@@ -3,6 +3,8 @@ import { createDatabase, type AppDatabase } from "@/lib/db";
 import { getFeed } from "@/lib/services/feed";
 import { getMatches } from "@/lib/services/matches";
 import { swipeProfile } from "@/lib/services/swipe";
+import { handleFeedGet } from "@/lib/routes/feed";
+import { handleMatchesGet } from "@/lib/routes/matches";
 import { handleSwipePost } from "@/lib/routes/swipe";
 import type { PublicProfile } from "@/lib/types";
 
@@ -140,6 +142,34 @@ describe("Discover services", () => {
 
     expect(invalid.status).toBe(400);
     expect(unknown.status).toBe(404);
+  });
+
+  it("serves only public feed data and rejects invalid feed query values", async () => {
+    addProfile("p1");
+    addSwipe("p1", "me", "like");
+
+    const response = handleFeedGet(
+      new Request("http://localhost/api/feed?limit=10"),
+      db,
+    );
+    const invalid = handleFeedGet(
+      new Request("http://localhost/api/feed?limit=100"),
+      db,
+    );
+    const payload = (await response.json()) as {
+      profiles: Array<Record<string, unknown>>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(Object.keys(payload.profiles[0] ?? {}).sort()).toEqual(
+      ["age", "bio", "city_or_college", "id", "interests", "name", "photo_url"].sort(),
+    );
+    expect(invalid.status).toBe(400);
+  });
+
+  it("returns an empty public matches payload when there are no mutual matches", async () => {
+    const response = handleMatchesGet(db);
+    expect(await response.json()).toEqual({ matches: [] });
   });
 
   it("returns the same false result shape for a pass and a non-mutual like", () => {
