@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { newDb } from "pg-mem";
 import {
   createDatabaseFromPool,
+  getDatabaseConnectionString,
   initializeDatabase,
   type AppDatabase,
 } from "@/lib/db";
@@ -13,6 +14,30 @@ import { handleMatchesGet } from "@/lib/routes/matches";
 import { handleSwipePost } from "@/lib/routes/swipe";
 import { seedDatabase } from "@/lib/seed";
 import type { PublicProfile } from "@/lib/types";
+
+describe("Database configuration", () => {
+  it("prefers the configured PostgreSQL provider URL over a generic database URL", () => {
+    const envNames = [
+      "POSTGRES_URL",
+      "POSTGRES_PRISMA_URL",
+      "POSTGRES_URL_NON_POOLING",
+      "DATABASE_URL",
+    ] as const;
+    const previousValues = envNames.map((name) => process.env[name]);
+
+    try {
+      process.env.POSTGRES_URL = "postgres://provider-url";
+      process.env.DATABASE_URL = "postgres://generic-url";
+      expect(getDatabaseConnectionString()).toBe("postgres://provider-url");
+    } finally {
+      envNames.forEach((name, index) => {
+        const previousValue = previousValues[index];
+        if (previousValue === undefined) delete process.env[name];
+        else process.env[name] = previousValue;
+      });
+    }
+  });
+});
 
 describe("Discover services", () => {
   let db: AppDatabase;
