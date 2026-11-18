@@ -58,14 +58,15 @@ export function EmptyDeck({ onViewMatches }: EmptyDeckProps) {
 }
 
 type DeckErrorProps = {
+  detail: string;
   onRetry: () => void;
 };
 
-export function DeckError({ onRetry }: DeckErrorProps) {
+export function DeckError({ detail, onRetry }: DeckErrorProps) {
   return (
     <DeckMessage
       title="We couldn't load profiles"
-      detail="Check your connection and give it another try."
+      detail={detail}
       icon={<AlertCircle aria-hidden="true" size={24} strokeWidth={1.8} />}
       action={
         <button

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { MapPin } from "lucide-react";
 import {
   motion,
@@ -9,7 +8,7 @@ import {
   useTransform,
 } from "framer-motion";
 import type { PanInfo } from "framer-motion";
-import { useState } from "react";
+import { ProfilePhoto } from "@/components/ProfilePhoto";
 import type { PublicProfile, SwipeDirection } from "@/lib/types";
 
 type ProfileCardProps = {
@@ -21,7 +20,6 @@ type ProfileCardProps = {
 export function ProfileCard({ profile, onSwipe, disabled }: ProfileCardProps) {
   const x = useMotionValue(0);
   const reducedMotion = useReducedMotion();
-  const [imageLoaded, setImageLoaded] = useState(false);
   const rotate = useTransform(
     x,
     [-220, 0, 220],
@@ -73,20 +71,13 @@ export function ProfileCard({ profile, onSwipe, disabled }: ProfileCardProps) {
       }`}
       aria-label={`${profile.name}, ${profile.age}`}
     >
-      <Image
+      <ProfilePhoto
         src={profile.photo_url}
         alt={`${profile.name}, ${profile.age}`}
-        fill
-        priority
         sizes="(max-width: 430px) 100vw, 430px"
-        className={`object-cover transition-opacity duration-500 ${
-          imageLoaded ? "opacity-100" : "opacity-0"
-        }`}
-        onLoad={() => setImageLoaded(true)}
+        className="object-cover"
+        priority
       />
-      {!imageLoaded && (
-        <div className="photo-placeholder absolute inset-0 animate-pulse" />
-      )}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
       <motion.div

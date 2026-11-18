@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { Heart, UserRound } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { PublicProfile } from "@/lib/types";
+import { ProfilePhoto } from "@/components/ProfilePhoto";
 
 type MatchOverlayProps = {
   profile: PublicProfile;
@@ -103,10 +103,9 @@ export function MatchOverlay({
             }
             className="relative -ml-5 h-28 w-28 overflow-hidden rounded-full border-[3px] border-match-bg bg-surface-2"
           >
-            <Image
+            <ProfilePhoto
               src={profile.photo_url}
               alt={`${profile.name}'s profile photo`}
-              fill
               sizes="112px"
               className="object-cover"
             />

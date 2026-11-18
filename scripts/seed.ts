@@ -1,12 +1,25 @@
-import path from "node:path";
-import { createDatabase } from "@/lib/db";
+import { loadEnvConfig } from "@next/env";
+import { createDatabase, initializeDatabase } from "@/lib/db";
 import { resetDatabase, seedDatabase } from "@/lib/seed";
 
-const db = createDatabase(path.join(process.cwd(), "data", "app.db"));
-if (process.argv.includes("--reset")) {
-  resetDatabase(db);
-} else {
-  seedDatabase(db);
+loadEnvConfig(process.cwd());
+
+async function main(): Promise<void> {
+  const db = createDatabase();
+  try {
+    await initializeDatabase(db);
+    if (process.argv.includes("--reset")) {
+      await resetDatabase(db);
+    } else {
+      await seedDatabase(db);
+    }
+    console.log("PostgreSQL demo database is ready.");
+  } finally {
+    await db.close();
+  }
 }
-db.close();
-console.log("Demo database is ready.");
+
+main().catch((error: unknown) => {
+  console.error("Unable to seed PostgreSQL demo database", error);
+  process.exitCode = 1;
+});

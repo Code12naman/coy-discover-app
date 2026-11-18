@@ -3,11 +3,11 @@ import { resetDatabase } from "@/lib/seed";
 
 export const runtime = "nodejs";
 
-export function POST(): Response {
+export async function POST(): Promise<Response> {
   if (process.env.NODE_ENV !== "development") {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
-  resetDatabase(getAppDatabase());
+  await resetDatabase(await getAppDatabase());
   return Response.json({ ok: true });
 }

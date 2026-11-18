@@ -15,51 +15,67 @@ export function swipeProfile(
   db: AppDatabase,
   targetId: string,
   direction: SwipeDirection,
-): SwipeResult {
-  const execute = db.transaction((): SwipeResult => {
-    const profile = db
-      .prepare(
-        `SELECT id, name, age, photo_url, bio, city_or_college, interests
-         FROM profiles WHERE id = ?`,
-      )
-      .get(targetId) as ProfileRow | undefined;
-
+): Promise<SwipeResult> {
+  return db.transaction(async (transaction) => {
+    const profileResult = await transaction.query<ProfileRow>(
+      `SELECT id, name, age, photo_url, bio, city_or_college, interests
+       FROM profiles WHERE id = $1`,
+      [targetId],
+    );
+    const profile = profileResult.rows[0];
     if (!profile) throw new UnknownProfileError();
 
-    const existingSwipe = db
-      .prepare(
-        "SELECT direction FROM swipes WHERE swiper_id = 'me' AND target_id = ?",
-      )
-      .get(targetId) as ExistingSwipeRow | undefined;
-    const reciprocalLike = db
-      .prepare(
-        `SELECT 1 FROM swipes
-         WHERE swiper_id = ? AND target_id = 'me' AND direction = 'like'`,
-      )
-      .get(targetId);
-
+    const existingSwipeResult = await transaction.query<ExistingSwipeRow>(
+      "SELECT direction FROM swipes WHERE swiper_id = 'me' AND target_id = $1",
+      [targetId],
+    );
+    const existingSwipe = existingSwipeResult.rows[0];
     if (existingSwipe) {
-      const existingMatch = db
-        .prepare("SELECT 1 FROM matches WHERE profile_id = ?")
-        .get(targetId);
-      return existingSwipe.direction === "like" && existingMatch
+      const existingMatch = await transaction.query(
+        "SELECT 1 FROM matches WHERE profile_id = $1",
+        [targetId],
+      );
+      return existingSwipe.direction === "like" && existingMatch.rows.length
         ? { matched: true, profile: toPublicProfile(profile) }
         : { matched: false };
     }
 
-    db.prepare(
-      "INSERT INTO swipes (swiper_id, target_id, direction) VALUES ('me', ?, ?)",
-    ).run(targetId, direction);
+    const inserted = await transaction.query<{ target_id: string }>(
+      `INSERT INTO swipes (swiper_id, target_id, direction)
+       VALUES ('me', $1, $2)
+       ON CONFLICT (swiper_id, target_id) DO NOTHING
+       RETURNING target_id`,
+      [targetId, direction],
+    );
+    if (!inserted.rows.length) {
+      const storedSwipe = await transaction.query<ExistingSwipeRow>(
+        "SELECT direction FROM swipes WHERE swiper_id = 'me' AND target_id = $1",
+        [targetId],
+      );
+      const existingMatch = await transaction.query(
+        "SELECT 1 FROM matches WHERE profile_id = $1",
+        [targetId],
+      );
+      return storedSwipe.rows[0]?.direction === "like" &&
+        existingMatch.rows.length
+        ? { matched: true, profile: toPublicProfile(profile) }
+        : { matched: false };
+    }
 
-    if (direction === "like" && reciprocalLike) {
-      db.prepare("INSERT OR IGNORE INTO matches (profile_id) VALUES (?)").run(
-        targetId,
+    const reciprocalLike = await transaction.query(
+      `SELECT 1 FROM swipes
+       WHERE swiper_id = $1 AND target_id = 'me' AND direction = 'like'`,
+      [targetId],
+    );
+
+    if (direction === "like" && reciprocalLike.rows.length) {
+      await transaction.query(
+        "INSERT INTO matches (profile_id) VALUES ($1) ON CONFLICT (profile_id) DO NOTHING",
+        [targetId],
       );
       return { matched: true, profile: toPublicProfile(profile) };
     }
 
     return { matched: false };
   });
-
-  return execute();
 }

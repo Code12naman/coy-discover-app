@@ -2,8 +2,8 @@
 
 A mobile-first, swipe-based Discover experience for Coy, built around a simple
 promise: nobody learns who liked them unless the feeling is mutual. The app
-uses a single demo account (`me`), persists swipes and matches in SQLite, and
-keeps every non-mutual like private.
+uses a single demo account (`me`), persists swipes and matches in PostgreSQL,
+and keeps every non-mutual like private.
 
 ## Screens
 
@@ -29,7 +29,7 @@ The screenshots below are captured from the running app at a 390 × 844 viewport
 
 ## Run locally
 
-Requires Node.js 22 or newer.
+Requires Node.js 22 or newer and a persistent PostgreSQL database.
 
 ```bash
 npm install
@@ -38,8 +38,10 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). On the first API request,
-the app also creates `./data/app.db` and seeds it automatically. The database
-file is local and gitignored.
+the app creates the PostgreSQL schema and seeds it automatically. Configure
+`DATABASE_URL` (or `POSTGRES_URL`) in your local `.env.local` before running
+these commands and in the hosting provider's production environment. The app
+deliberately has no SQLite or ephemeral-filesystem fallback.
 
 Useful commands:
 
@@ -159,17 +161,26 @@ Returns mutual matches, newest first. Each public profile includes `matchedAt`.
 Clears swipes and matches, then restores the deterministic seed state. Returns
 `{"ok":true}` in development and `404` otherwise.
 
-## Privacy design
+## Production data and privacy
+
+The app uses PostgreSQL through `pg`, with a one-connection pool per warm
+serverless instance. Schema initialization and idempotent seed insertion run
+before API requests, so the 36 demo profiles are available when the persistent
+database is first connected. Swipes and matches live in that same database and
+survive function restarts and redeployments. Set the hosted database's
+connection string as `DATABASE_URL` (or one of `POSTGRES_URL`,
+`POSTGRES_PRISMA_URL`, or `POSTGRES_URL_NON_POOLING`) in Vercel. No database
+secret belongs in source control.
 
 - `profiles` contains no like state. Seeded incoming likes and passes are
   private rows in `swipes` with `target_id = 'me'`; the profile mapper selects
   and validates only public fields before any response is built.
-- Feed selection uses `NOT EXISTS` for a swipe by `me` and orders solely by
+- Feed selection excludes swipe targets for `me` and orders solely by
   profile ID. It never joins, sorts, or branches on incoming like state.
 - The swipe service checks for a reciprocal like for either direction and
   returns the exact same `{ "matched": false }` payload for a pass and a
   non-mutual like. A profile is included only when a mutual match exists.
-- The swipe row and any resulting match row are committed in one SQLite
+- The swipe row and any resulting match row are committed in one PostgreSQL
   transaction. The matches query also verifies both stored directions are
   likes, so seeded incoming actions alone never appear as matches.
 - Error responses do not include database details or explain why a swipe did
@@ -177,9 +188,10 @@ Clears swipes and matches, then restores the deterministic seed state. Returns
 
 ## Design decisions
 
-- **SQLite / better-sqlite3:** a local file keeps the demo reproducible,
-  persistent across restarts, and dependency-light. The service functions
-  accept a database handle, so tests use isolated in-memory databases.
+- **PostgreSQL:** Vercel functions may run on ephemeral, read-only filesystems,
+  so a local SQLite file is not a production persistence layer. PostgreSQL
+  keeps seed profiles, swipes, and matches durable across instances and
+  deployments. Tests use an isolated in-memory PostgreSQL-compatible database.
 - **Transaction for a swipe:** the choice and possible match must never be
   observed in a partially written state.
 - **Single-user assumption:** this assignment has no external auth; every
@@ -189,11 +201,11 @@ Clears swipes and matches, then restores the deterministic seed state. Returns
   incoming actions and make feed behavior deterministic for the demo.
 
 With more time, I would add real authentication and per-user authorization,
-cursor pagination, undo-last-swipe, rate limiting, and a Postgres deployment
-path. I would also replace the placeholder portrait service with a curated,
-consented image set.
+cursor pagination, undo-last-swipe, and rate limiting. I would also replace the
+placeholder portrait service with a curated, consented image set.
 
 ## Stack
 
 Next.js App Router with TypeScript, Route Handlers on the Node runtime,
-Tailwind CSS, Framer Motion, Lucide, Zod, SQLite via better-sqlite3, and Vitest.
+Tailwind CSS, Framer Motion, Lucide, Zod, PostgreSQL via `pg`, and Vitest with
+`pg-mem` for isolated service tests.

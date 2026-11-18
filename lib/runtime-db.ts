@@ -1,17 +1,28 @@
-import path from "node:path";
-import { createDatabase } from "@/lib/db";
+import { createDatabase, initializeDatabase, type AppDatabase } from "@/lib/db";
 import { seedDatabase } from "@/lib/seed";
 
 const globalForCoy = globalThis as typeof globalThis & {
-  coyDatabase?: ReturnType<typeof createDatabase>;
+  coyDatabasePromise?: Promise<AppDatabase>;
 };
 
-export function getAppDatabase(): ReturnType<typeof createDatabase> {
-  if (!globalForCoy.coyDatabase) {
-    const db = createDatabase(path.join(process.cwd(), "data", "app.db"));
-    seedDatabase(db);
-    globalForCoy.coyDatabase = db;
+export function getAppDatabase(): Promise<AppDatabase> {
+  if (!globalForCoy.coyDatabasePromise) {
+    const database = createDatabase();
+    globalForCoy.coyDatabasePromise = (async () => {
+      await initializeDatabase(database);
+      await seedDatabase(database);
+      return database;
+    })().catch(async (error: unknown) => {
+      globalForCoy.coyDatabasePromise = undefined;
+      await database.close().catch((closeError: unknown) => {
+        console.error(
+          "[database] failed to close after initialization error",
+          closeError,
+        );
+      });
+      throw error;
+    });
   }
 
-  return globalForCoy.coyDatabase;
+  return globalForCoy.coyDatabasePromise;
 }

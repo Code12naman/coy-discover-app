@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { AnimatePresence } from "framer-motion";
 import { Heart, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,8 +7,10 @@ import { DeckError, DeckSkeleton, EmptyDeck } from "@/components/DeckStates";
 import { MatchOverlay } from "@/components/MatchOverlay";
 import { MatchesView } from "@/components/MatchesView";
 import { ProfileCard } from "@/components/ProfileCard";
+import { ProfilePhoto } from "@/components/ProfilePhoto";
 import { SwipeActions } from "@/components/SwipeActions";
 import { Toast } from "@/components/Toast";
+import { getApiErrorMessage, getClientErrorMessage } from "@/lib/client-errors";
 import {
   FeedResponseSchema,
   SwipeResponseSchema,
@@ -26,8 +27,8 @@ export function DiscoverScreen() {
   const [loading, setLoading] = useState(true);
   const [moreLoading, setMoreLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [feedError, setFeedError] = useState(false);
-  const [prefetchError, setPrefetchError] = useState(false);
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [prefetchError, setPrefetchError] = useState<string | null>(null);
   const [swipePending, setSwipePending] = useState(false);
   const [lastDirection, setLastDirection] = useState<SwipeDirection>("like");
   const [matchedProfile, setMatchedProfile] = useState<PublicProfile | null>(
@@ -43,20 +44,33 @@ export function DiscoverScreen() {
 
   const loadInitialFeed = useCallback(async () => {
     setLoading(true);
-    setFeedError(false);
-    setPrefetchError(false);
+    setFeedError(null);
+    setPrefetchError(null);
     try {
       const response = await fetch("/api/feed", { cache: "no-store" });
-      if (!response.ok) throw new Error("Unable to load profiles");
+      if (!response.ok)
+        throw new Error(
+          await getApiErrorMessage(
+            response,
+            "Unable to load profiles right now. Please try again.",
+          ),
+        );
       const parsed = FeedResponseSchema.safeParse(await response.json());
-      if (!parsed.success) throw new Error("Invalid feed response");
+      if (!parsed.success) {
+        throw new Error("The profile feed returned an unexpected response.");
+      }
       const nextProfiles = parsed.data.profiles;
       seenIds.current = new Set(nextProfiles.map(({ id }) => id));
       setProfiles(nextProfiles);
       setDecidedIds(new Set());
       setHasMore(nextProfiles.length === 10);
-    } catch {
-      setFeedError(true);
+    } catch (error) {
+      setFeedError(
+        getClientErrorMessage(
+          error,
+          "Unable to connect. Please check your connection and try again.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -72,10 +86,17 @@ export function DiscoverScreen() {
     if (moreBusy.current || !hasMore) return;
     moreBusy.current = true;
     setMoreLoading(true);
-    setPrefetchError(false);
+    setPrefetchError(null);
     try {
       const response = await fetch("/api/feed", { cache: "no-store" });
-      if (!response.ok) throw new Error("Unable to load more profiles");
+      if (!response.ok) {
+        throw new Error(
+          await getApiErrorMessage(
+            response,
+            "Unable to load more profiles. Please try again.",
+          ),
+        );
+      }
       const parsed = FeedResponseSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error("Invalid feed response");
       const batch = parsed.data.profiles;
@@ -83,8 +104,13 @@ export function DiscoverScreen() {
       for (const profile of batch) seenIds.current.add(profile.id);
       setProfiles((current) => [...current, ...newProfiles]);
       setHasMore(batch.length === 10);
-    } catch {
-      setPrefetchError(true);
+    } catch (error) {
+      setPrefetchError(
+        getClientErrorMessage(
+          error,
+          "Unable to load additional profiles. Please try again.",
+        ),
+      );
     } finally {
       moreBusy.current = false;
       setMoreLoading(false);
@@ -118,20 +144,32 @@ export function DiscoverScreen() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ targetId: profile.id, direction }),
         });
-        if (!response.ok) throw new Error("Unable to save swipe");
+        if (!response.ok) {
+          throw new Error(
+            await getApiErrorMessage(
+              response,
+              "Unable to save your choice. Please try again.",
+            ),
+          );
+        }
         const parsed = SwipeResponseSchema.safeParse(await response.json());
         if (!parsed.success) throw new Error("Invalid swipe response");
         if (parsed.data.matched) {
           setMatchedProfile(parsed.data.profile);
           setMatchCount((count) => (count === null ? null : count + 1));
         }
-      } catch {
+      } catch (error) {
         setDecidedIds((current) => {
           const restored = new Set(current);
           restored.delete(profile.id);
           return restored;
         });
-        setToastMessage("That choice didn't save. Please try again.");
+        setToastMessage(
+          getClientErrorMessage(
+            error,
+            "That choice didn't save. Please check your connection and try again.",
+          ),
+        );
       } finally {
         swipeBusy.current = false;
         setSwipePending(false);
@@ -253,7 +291,10 @@ export function DiscoverScreen() {
           {loading ? (
             <DeckSkeleton />
           ) : feedError ? (
-            <DeckError onRetry={() => void loadInitialFeed()} />
+            <DeckError
+              detail={feedError}
+              onRetry={() => void loadInitialFeed()}
+            />
           ) : currentProfile ? (
             <>
               <div className="relative mt-4 h-[min(56dvh,520px)] w-full">
@@ -262,13 +303,12 @@ export function DiscoverScreen() {
                     aria-hidden="true"
                     className="absolute inset-x-2 top-3 h-full origin-top scale-[0.96] overflow-hidden rounded-[26px] bg-surface-2 opacity-70"
                   >
-                    <Image
+                    <ProfilePhoto
                       src={nextProfile.photo_url}
                       alt=""
-                      fill
-                      priority
                       sizes="(max-width: 430px) 90vw, 390px"
                       className="object-cover"
+                      priority
                     />
                   </div>
                 )}
@@ -291,7 +331,7 @@ export function DiscoverScreen() {
                   onClick={() => void loadMoreProfiles()}
                   className="mx-auto mt-1 block min-h-10 px-3 text-center text-xs text-muted underline underline-offset-4"
                 >
-                  Couldn&apos;t load more profiles. Try again
+                  Couldn&apos;t load more profiles: {prefetchError} Try again
                 </button>
               )}
             </>

@@ -8,12 +8,14 @@ export type ProfileRow = {
   photo_url: string;
   bio: string;
   city_or_college: string;
-  interests: string;
+  interests: string[] | string;
 };
 
 export function toPublicProfile(row: ProfileRow): PublicProfile {
-  return PublicProfileSchema.parse({
-    ...row,
-    interests: JSON.parse(row.interests),
-  });
+  const interests =
+    typeof row.interests === "string"
+      ? JSON.parse(row.interests)
+      : row.interests;
+
+  return PublicProfileSchema.parse({ ...row, interests });
 }

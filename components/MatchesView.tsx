@@ -1,9 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { ArrowLeft, Heart, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { MatchesResponseSchema, type MatchedProfile } from "@/lib/types";
+import { ProfilePhoto } from "@/components/ProfilePhoto";
+import { getApiErrorMessage, getClientErrorMessage } from "@/lib/client-errors";
 
 type MatchesViewProps = {
   onBack: () => void;
@@ -13,18 +14,32 @@ type MatchesViewProps = {
 export function MatchesView({ onBack, onMatchesLoaded }: MatchesViewProps) {
   const [matches, setMatches] = useState<MatchedProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadMatches = useCallback(async () => {
     try {
       const response = await fetch("/api/matches", { cache: "no-store" });
-      if (!response.ok) throw new Error("Unable to load matches");
+      if (!response.ok) {
+        throw new Error(
+          await getApiErrorMessage(
+            response,
+            "Unable to load matches right now. Please try again.",
+          ),
+        );
+      }
       const parsed = MatchesResponseSchema.safeParse(await response.json());
-      if (!parsed.success) throw new Error("Invalid matches response");
+      if (!parsed.success) {
+        throw new Error("The matches service returned an unexpected response.");
+      }
       setMatches(parsed.data.matches);
       onMatchesLoaded(parsed.data.matches.length);
-    } catch {
-      setError(true);
+    } catch (error) {
+      setError(
+        getClientErrorMessage(
+          error,
+          "Unable to connect. Please check your connection and try again.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -79,14 +94,12 @@ export function MatchesView({ onBack, onMatchesLoaded }: MatchesViewProps) {
       ) : error ? (
         <div className="mt-10 flex min-h-[45vh] flex-col items-center justify-center text-center">
           <p className="font-display text-2xl">Matches aren&apos;t loading</p>
-          <p className="mt-2 text-sm text-muted">
-            Check your connection and try again.
-          </p>
+          <p className="mt-2 text-sm text-muted">{error}</p>
           <button
             type="button"
             onClick={() => {
               setLoading(true);
-              setError(false);
+              setError(null);
               void loadMatches();
             }}
             className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-5 text-sm font-medium"
@@ -112,10 +125,9 @@ export function MatchesView({ onBack, onMatchesLoaded }: MatchesViewProps) {
               key={profile.id}
               className="relative aspect-[0.78] overflow-hidden rounded-[22px] bg-surface-2 shadow-card"
             >
-              <Image
+              <ProfilePhoto
                 src={profile.photo_url}
                 alt={`${profile.name}, ${profile.age}`}
-                fill
                 sizes="(max-width: 430px) 50vw, 215px"
                 className="object-cover"
               />

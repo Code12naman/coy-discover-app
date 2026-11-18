@@ -363,35 +363,57 @@ const seededLikes = [
 ];
 const seededPasses = ["p10", "p11", "p12"];
 
-function insertSeedData(db: AppDatabase): void {
-  const insertProfile = db.prepare(`
-    INSERT OR IGNORE INTO profiles
-      (id, name, age, photo_url, bio, city_or_college, interests)
-    VALUES (@id, @name, @age, @photo_url, @bio, @city_or_college, @interests)
-  `);
+async function insertSeedData(db: AppDatabase): Promise<void> {
+  const profileValues = seedProfiles.flatMap((profile) => [
+    profile.id,
+    profile.name,
+    profile.age,
+    profile.photo_url,
+    profile.bio,
+    profile.city_or_college,
+    JSON.stringify(profile.interests),
+  ]);
+  const profileRows = seedProfiles
+    .map((_, index) => {
+      const start = index * 7 + 1;
+      return `($${start}, $${start + 1}, $${start + 2}, $${start + 3}, $${start + 4}, $${start + 5}, $${start + 6}::jsonb)`;
+    })
+    .join(", ");
+  await db.query(
+    `INSERT INTO profiles
+       (id, name, age, photo_url, bio, city_or_college, interests)
+     VALUES ${profileRows}
+     ON CONFLICT (id) DO NOTHING`,
+    profileValues,
+  );
 
-  for (const profile of seedProfiles) {
-    insertProfile.run({
-      ...profile,
-      interests: JSON.stringify(profile.interests),
-    });
-  }
-
-  const insertSwipe = db.prepare(`
-    INSERT OR IGNORE INTO swipes (swiper_id, target_id, direction)
-    VALUES (?, 'me', ?)
-  `);
-  for (const id of seededLikes) insertSwipe.run(id, "like");
-  for (const id of seededPasses) insertSwipe.run(id, "pass");
+  const incomingSwipes = [
+    ...seededLikes.map((id) => ({ id, direction: "like" })),
+    ...seededPasses.map((id) => ({ id, direction: "pass" })),
+  ];
+  const swipeValues = incomingSwipes.flatMap(({ id, direction }) => [
+    id,
+    direction,
+  ]);
+  const swipeRows = incomingSwipes
+    .map((_, index) => `($${index * 2 + 1}, 'me', $${index * 2 + 2})`)
+    .join(", ");
+  await db.query(
+    `INSERT INTO swipes (swiper_id, target_id, direction)
+     VALUES ${swipeRows}
+     ON CONFLICT (swiper_id, target_id) DO NOTHING`,
+    swipeValues,
+  );
 }
 
-export function seedDatabase(db: AppDatabase): void {
-  db.transaction(() => insertSeedData(db))();
+export function seedDatabase(db: AppDatabase): Promise<void> {
+  return db.transaction(insertSeedData);
 }
 
-export function resetDatabase(db: AppDatabase): void {
-  db.transaction(() => {
-    db.exec("DELETE FROM matches; DELETE FROM swipes;");
-    insertSeedData(db);
-  })();
+export function resetDatabase(db: AppDatabase): Promise<void> {
+  return db.transaction(async (transaction) => {
+    await transaction.query("DELETE FROM matches");
+    await transaction.query("DELETE FROM swipes");
+    await insertSeedData(transaction);
+  });
 }

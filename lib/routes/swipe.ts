@@ -20,7 +20,7 @@ export async function handleSwipePost(
 
   try {
     return Response.json(
-      swipeProfile(db, parsed.data.targetId, parsed.data.direction),
+      await swipeProfile(db, parsed.data.targetId, parsed.data.direction),
     );
   } catch (error) {
     if (error instanceof UnknownProfileError) {
